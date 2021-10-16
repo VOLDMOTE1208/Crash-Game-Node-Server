@@ -29,6 +29,11 @@ gameSocket = io.on('connection', function(socket){
       console.log('user disconnected');
     });
     
+    socket.on('bet amount', (req) => {
+      console.log(req)
+      socket.emit('user list', req);
+    });
+
     console.log("user connected")
     console.log('socket connected: ' + socket.id);    
     socket.emit('connected', {});
