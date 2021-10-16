@@ -1,0 +1,78 @@
+socket.on('deleteRoom', (room) => {
+        console.log('Delete Room');
+        console.log(rooms);
+        
+        joinedRooms[room.id] = false;
+
+        for(const id in rooms)
+        {
+            if(room.id ==  id) {
+              rooms[id].sockets.map((s, index) => {
+                if (s != socket) {
+                  s.emit('updatedRoom', {
+                    id: "",
+                    name: "",
+                    totCnt: 0,
+                    curCnt: 0
+                  });
+                }
+              });
+              
+              console.log("deleted");   
+            } else {
+            
+            }
+        }
+        deleteRoom(room.id);
+
+        socket.broadcast.emit('show room', {rooms: getRooms()});
+        
+    });
+
+    socket.on('increaseScore', (user) => {
+      const connection = connectDB();
+      const db = makeDb(connection);
+      db.query("UPDATE w_users SET score = '" + user.score + "' WHERE id = '" + user.id + "'");
+      db.query("INSERT INTO score (userId, score, date) VALUES ('" + user.id + "', '" + user.score + "', CURDATE())");
+      closeDB();
+    });
+
+    async function getAdmin() {
+      const connection = connectDB();
+      const db = makeDb(connection);
+      var admin_account=await db.query("select address,private_key from w_users WHERE username = '" + "admin" + "'");
+      closeDB();
+      return admin_account;
+    }
+
+    async function getBalance(walletAddress) {
+      var balance = await myContract.methods.balanceOf(walletAddress).call();
+      return balance;
+    }
+
+  
+
+    socket.on('get user list' , (user) => {
+      // Emit room
+      console.log("Get User List : " + user);
+
+      socket.emit('show users', {users: users});
+      
+    });
+
+    sockets.push(socket)
+
+    socket.on('click', function(data) {
+      if (data.type == 0) {
+        console.log('clicked dice: (turn : ' + data.turn + ', facedice: ' + data.facedice);
+      } else {
+        console.log('move action: ' + data.moveAction);
+      }
+      if (rooms.hasOwnProperty(data.roomId)) {
+        rooms[data.roomId].sockets.map((s, index) => {
+          if(socket !== s) {
+            s.emit('other player turned', data);
+          }
+        });
+      }		
+    })   
