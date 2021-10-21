@@ -23,6 +23,7 @@ var isRunning = false;
 var endGame = false;
 var start_time = 6;
 var currentAmount = 1;
+var timeoutObj;
 server.listen(port, function(){
 	console.log('listening on *:' + port + '--- server is running ...');
 });
@@ -36,18 +37,21 @@ gameSocket = io.on('connection', function(socket){
     
     socket.on('bet amount', (req) => {
       console.log(req)
-      socket.emit('user list', req);
+      if(!isRunning)
+        socket.emit('isRunning', {running:false});
+      if(isRunning)
+        socket.emit('isRunning', {running:true});
     });
 
     console.log('socket connected: ' + socket.id);    
     socket.emit('connected', {});
     
-    timeoutObj = setInterval(() => {
+    setInterval(() => {
       if(!isRunning)
         socket.emit('startTime', {timeCount:start_time});
     }, 1000);
 
-    timeoutObj = setInterval(() => {
+    setInterval(() => {
       if(isRunning)
         socket.emit('currentAmount', {currentAmount:currentAmount});
     }, 100);
@@ -73,6 +77,7 @@ gameSocket = io.on('connection', function(socket){
           }
           else if(currentAmount.toFixed(2)==totalNum){
             isRunning=false;
+            clearInterval(timeoutObj);
           }
         },100);     
       } 
@@ -84,7 +89,7 @@ gameSocket = io.on('connection', function(socket){
     return Math.random() * (max - min) + min;
   }
 
-  timeoutObj = setInterval(() => {
+  setInterval(() => {
     if(!isRunning)
       startTime()
   }, 1000); 
