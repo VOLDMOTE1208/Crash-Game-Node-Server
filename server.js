@@ -33,6 +33,8 @@ server.listen(port, function(){
 // Implement socket functionality
 gameSocket = io.on('connection', function(socket){
 
+  socket.emit('gameStart', {leftAmount:virtualMoney});
+  console.log({leftAmount:virtualMoney})
     socket.on('disconnect', () => {
       console.log('user disconnected');
     });
@@ -40,12 +42,13 @@ gameSocket = io.on('connection', function(socket){
     socket.on('bet amount', (req) => {
       console.log(req)
       var betAmount = req["betAmount"];
-      var sendAmount = virtualMoney - betAmount;
+      virtualMoney -= betAmount;
+      var sendAmount = virtualMoney;
       if(!isRunning)
         socket.emit('gameStart', {leftAmount:sendAmount});
       if(isRunning)
         socket.emit('isRunning', {running:true});
-    });
+    });    
 
     socket.on('CashOut', (req) => {
         var getAmount = currentAmount*req["betAmount"];
@@ -81,7 +84,7 @@ gameSocket = io.on('connection', function(socket){
         timeoutObj = setInterval(() => {
           // socket.emit('currentTime', {timeCount:i});
           if(currentAmount.toFixed(2)!=totalNum){
-            console.log(currentAmount.toFixed(2))
+            // console.log(currentAmount.toFixed(2))
             currentAmount+=0.01;
           }
           else if(currentAmount.toFixed(2)==totalNum){
