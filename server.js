@@ -52,7 +52,7 @@ gameSocket = io.on('connection', function(socket){
         socket.emit('BettingResult', {leftAmount:getAmount});
     });
 
-    console.log('socket connected: ' + socket.id);    
+    console.log('socket connected: ' + socket.id);
     socket.emit('connected', {});
     
     setInterval(() => {
