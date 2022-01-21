@@ -1,110 +1,153 @@
-const routes = require('./routes/myroutes');
 var express = require('express');
 var app = express();
+const axios = require("axios");
+require('dotenv').config();
 var bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 var cors = require('cors');
-const util = require( 'util' );
+const util = require('util');
 var server = require('http').createServer(app);
-var port = 3000;
+var port = 5000;
 var io = require('socket.io')(server);
+axios.defaults.headers.common["Authorization"] = process.env.SECRETCODE;
 
 gameSocket = null;
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
-app.use('/api', routes);
 
-// Start server
-// server.listen(port);
-
-var isRunning = false;
-var endGame = false;
-var start_time = 6;
-var currentAmount = 1;
-var timeoutObj;
-var virtualMoney = 1000;
-
-server.listen(port, function(){
-	console.log('listening on *:' + port + '--- server is running ...');
+server.listen(port, function () {
+	console.log("server is running on " + port);
 });
 
+
+
 // Implement socket functionality
-gameSocket = io.on('connection', function(socket){
+gameSocket = io.on('connection', function (socket) {
+	socket.on('disconnect', () => {
+		console.log('user disconnected');
+	});
 
-  socket.emit('gameStart', {leftAmount:virtualMoney});
-  console.log({leftAmount:virtualMoney})
-    socket.on('disconnect', () => {
-      console.log('user disconnected');
-    });
-    
-    socket.on('bet amount', (req) => {
-      console.log(req)
-      var betAmount = req["betAmount"];
-      virtualMoney -= betAmount;
-      var sendAmount = virtualMoney;
-      if(!isRunning)
-        socket.emit('gameStart', {leftAmount:sendAmount});
-      if(isRunning)
-        socket.emit('isRunning', {running:true});
-    });    
+	socket.on('bet info', (req) => {
+		var randomArray = [];
+		var betResult = [];
+		var counts = [];
+		var isBetting;
+		var amount;
+		var userToken;
 
-    socket.on('CashOut', (req) => {
-        var getAmount = currentAmount*req["betAmount"];
-        socket.emit('BettingResult', {leftAmount:getAmount});
-    });
+		console.log(req);	
 
-    console.log('socket connected: ' + socket.id);
-    socket.emit('connected', {});
-    
-    setInterval(() => {
-      if(!isRunning)
-        socket.emit('startTime', {timeCount:start_time});
-    }, 1000);
+		try {
+			isBetting = req.isBetting;
+			betAmount = req.betAmount;
+			amount = req.amount - betAmount;		
+			userToken = req.token;
 
-    setInterval(() => {
-      if(isRunning)
-        socket.emit('currentAmount', {currentAmount:currentAmount});
-    }, 100);
-    	/////////////////////////////////
-  });  
-  
-  function startTime(){     
-    console.log(start_time)   
-    start_time--;
-    if(start_time==-1){
-      isRunning=true;
-      start_time=6;
+			try{
+				axios.post(process.env.PLATFORM_SERVER + "api/games/bet", {
+					token: req.token,
+					amount: req.betAmount
+				}); 
+			  }catch(err){
+				throw new Error("Bet Error")
+			  }
 
-      if(isRunning){
-        var totalNum = (999999999/parseFloat(getRandomArbitrary(1,1000000000))).toFixed(2);
-        console.log(totalNum)
-        currentAmount=1;
-        timeoutObj = setInterval(() => {
-          // socket.emit('currentTime', {timeCount:i});
-          if(currentAmount.toFixed(2)!=totalNum){
-            // console.log(currentAmount.toFixed(2))
-            currentAmount+=0.01;
-          }
-          else if(currentAmount.toFixed(2)==totalNum){
-            isRunning=false;
-            endGame =true;
-            clearInterval(timeoutObj);
-          }
-        },100);     
-      } 
+			randomArray = CreateRandomArray();
+			console.log(randomArray)
+			counts = count_duplicate(randomArray);
+			var amountCross = getScore(counts);
+			var earnAmount = betAmount * amountCross;
+			amount += earnAmount;
+			console.log(amountCross, earnAmount, amount);
 
-    }          
+			try{
+				axios.post(process.env.PLATFORM_SERVER + "api/games/winlose", {
+				  token: userToken,
+				  amount: earnAmount,
+				  winState: true
+				});
+			  }catch(err){
+				throw new Error("Can't find server")
+			  }
+
+			betResult = {"amountCross":amountCross, "earnAmount":earnAmount, "amount":amount, "randomArray":randomArray};
+			socket.emit("game result", betResult)
+		} catch (err) {
+			socket.emit("error", {message: err.message})
+		}
+	}); 
+
+	console.log('socket connected: ' + socket.id);
+	socket.emit('connected', {});
+});
+
+function CreateRandomArray() {
+	var randomArray = [];
+	for (var i = 0; i < 5; i++) {
+		var randomNum = getRandomInt(7);
+		randomArray.push(randomNum);
+	}
+	return randomArray;
 }
 
-  function getRandomArbitrary(min, max) {
-    return Math.random() * (max - min) + min;
-  }
+function getRandomInt(max) {
+	return Math.floor(Math.random() * max);
+}
 
-  setInterval(() => {
-    if(!isRunning){
-      endGame=false;
-      startTime()
-    }
-  }, 1000); 
+function count_duplicate(randomArray) {
+	var counts = [];
+	randomArray.forEach((i) => { counts[i] = (counts[i] || 0) + 1 });
+	counts = counts.filter((c) => { if (c) return c });
+	counts = counts.sort();
+	return counts;
+}
+
+const getScore = (counts) => {
+	for (var score of scores) {
+		if (arrayEquals(counts, score.counts)) {
+			return score.rate;
+		}
+	}
+	return 0;
+}
+
+function arrayEquals(a, b) {
+	return Array.isArray(a) &&
+		Array.isArray(b) &&
+		a.length === b.length &&
+		a.every((val, index) => val === b[index]);
+}
+
+// score
+var scores = [
+	{
+		counts: [1, 1, 1, 1, 1],
+		rate: 0
+	},
+	{
+		counts: [1, 1, 1, 2],
+		rate: 0.1
+	},
+	{
+		counts: [1, 2, 2],
+		rate: 2
+	},
+	{
+		counts: [1, 1, 3],
+		rate: 3
+	},
+	{
+		counts: [2, 3],
+		rate: 4
+	},
+	{
+		counts: [1, 4],
+		rate: 5
+	},
+	{
+		counts: [5],
+		rate: 50
+	},
+]
